@@ -2,7 +2,9 @@
 import type { Category, Publisher } from '../types/game';
 
 interface Props {
+    /** Categories to render as checkbox filter options. */
     categories: Category[];
+    /** Publishers to render as checkbox filter options. */
     publishers: Publisher[];
 }
 
@@ -74,6 +76,7 @@ const { categories, publishers } = Astro.props;
 </div>
 
 <script>
+    /** Wires up change/click handlers that filter the game grid client-side. */
     function setUp(): void {
         const checkboxes = Array.from(
             document.querySelectorAll<HTMLInputElement>('.game-filter-checkbox'),
@@ -86,12 +89,19 @@ const { categories, publishers } = Astro.props;
         const emptyState = document.querySelector<HTMLElement>('[data-testid="filters-empty-state"]');
         const grid = document.querySelector<HTMLElement>('[data-testid="games-grid"]');
 
+        /**
+         * The checked filter ids for one dimension (category or publisher).
+         *
+         * @param dimension - Which filter group to read, `'category'` or `'publisher'`.
+         * @returns The `data-filter-id` values of the checked checkboxes in that dimension.
+         */
         function selectedIds(dimension: string): string[] {
             return checkboxes
                 .filter((checkbox) => checkbox.dataset.filterDimension === dimension && checkbox.checked)
                 .map((checkbox) => checkbox.dataset.filterId ?? '');
         }
 
+        /** Recomputes visible cards, the live status text, and empty-state/grid visibility from the current checkbox state. */
         function applyFilters(): void {
             const categoryIds = selectedIds('category');
             const publisherIds = selectedIds('publisher');
