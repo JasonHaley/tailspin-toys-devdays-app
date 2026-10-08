@@ -6,6 +6,9 @@ import {
     getAllGames,
     getAllGameIds,
     getGameById,
+    getAllCategories,
+    getAllPublishers,
+    getFilteredGames,
 } from './games';
 
 async function seedGames(db: Database, count: number): Promise<void> {
@@ -28,6 +31,64 @@ async function seedGames(db: Database, count: number): Promise<void> {
             publisherId: publisher.id,
         });
     }
+}
+
+/** Seeds two categories, two publishers, and games spread across the combinations. */
+async function seedCatalog(db: Database): Promise<{
+    strategyId: number;
+    puzzleId: number;
+    pubOneId: number;
+    pubTwoId: number;
+}> {
+    const [strategy] = await db
+        .insert(categories)
+        .values({ name: 'Strategy', description: 'cat' })
+        .returning({ id: categories.id });
+    const [puzzle] = await db
+        .insert(categories)
+        .values({ name: 'Puzzle', description: 'cat' })
+        .returning({ id: categories.id });
+    const [pubOne] = await db
+        .insert(publishers)
+        .values({ name: 'Pub One', description: 'pub' })
+        .returning({ id: publishers.id });
+    const [pubTwo] = await db
+        .insert(publishers)
+        .values({ name: 'Pub Two', description: 'pub' })
+        .returning({ id: publishers.id });
+
+    await db.insert(games).values([
+        {
+            title: 'Game A (Strategy, Pub One)',
+            description: 'desc',
+            starRating: 4.0,
+            categoryId: strategy.id,
+            publisherId: pubOne.id,
+        },
+        {
+            title: 'Game B (Strategy, Pub Two)',
+            description: 'desc',
+            starRating: 4.0,
+            categoryId: strategy.id,
+            publisherId: pubTwo.id,
+        },
+        {
+            title: 'Game C (Puzzle, Pub One)',
+            description: 'desc',
+            starRating: 4.0,
+            categoryId: puzzle.id,
+            publisherId: pubOne.id,
+        },
+        {
+            title: 'Game D (Puzzle, Pub Two)',
+            description: 'desc',
+            starRating: 4.0,
+            categoryId: puzzle.id,
+            publisherId: pubTwo.id,
+        },
+    ]);
+
+    return { strategyId: strategy.id, puzzleId: puzzle.id, pubOneId: pubOne.id, pubTwoId: pubTwo.id };
 }
 
 describe('games data-access helpers', () => {
@@ -62,5 +123,102 @@ describe('games data-access helpers', () => {
     it('returns null for a non-existent game', async () => {
         await seedGames(db, 2);
         expect(await getGameById(db, 99999)).toBeNull();
+    });
+});
+
+describe('getAllCategories', () => {
+    let db: Database;
+
+    beforeEach(async () => {
+        db = await createTestDatabase();
+    });
+
+    it('returns all categories ordered by name', async () => {
+        await seedCatalog(db);
+        const all = await getAllCategories(db);
+        expect(all.map((c) => c.name)).toEqual(['Puzzle', 'Strategy']);
+    });
+
+    it('returns an empty array when there are no categories', async () => {
+        expect(await getAllCategories(db)).toEqual([]);
+    });
+});
+
+describe('getAllPublishers', () => {
+    let db: Database;
+
+    beforeEach(async () => {
+        db = await createTestDatabase();
+    });
+
+    it('returns all publishers ordered by name', async () => {
+        await seedCatalog(db);
+        const all = await getAllPublishers(db);
+        expect(all.map((p) => p.name)).toEqual(['Pub One', 'Pub Two']);
+    });
+
+    it('returns an empty array when there are no publishers', async () => {
+        expect(await getAllPublishers(db)).toEqual([]);
+    });
+});
+
+describe('getFilteredGames', () => {
+    let db: Database;
+
+    beforeEach(async () => {
+        db = await createTestDatabase();
+    });
+
+    it('returns all games ordered by title when no filters are given', async () => {
+        await seedCatalog(db);
+        const all = await getFilteredGames(db);
+        expect(all.map((g) => g.title)).toEqual([
+            'Game A (Strategy, Pub One)',
+            'Game B (Strategy, Pub Two)',
+            'Game C (Puzzle, Pub One)',
+            'Game D (Puzzle, Pub Two)',
+        ]);
+    });
+
+    it('filters by a single category', async () => {
+        const { strategyId } = await seedCatalog(db);
+        const result = await getFilteredGames(db, { categoryIds: [strategyId] });
+        expect(result.map((g) => g.title)).toEqual(['Game A (Strategy, Pub One)', 'Game B (Strategy, Pub Two)']);
+    });
+
+    it('filters by multiple categories (OR within the dimension)', async () => {
+        const { strategyId, puzzleId } = await seedCatalog(db);
+        const result = await getFilteredGames(db, { categoryIds: [strategyId, puzzleId] });
+        expect(result).toHaveLength(4);
+    });
+
+    it('filters by a single publisher', async () => {
+        const { pubOneId } = await seedCatalog(db);
+        const result = await getFilteredGames(db, { publisherIds: [pubOneId] });
+        expect(result.map((g) => g.title)).toEqual(['Game A (Strategy, Pub One)', 'Game C (Puzzle, Pub One)']);
+    });
+
+    it('combines category and publisher filters with AND', async () => {
+        const { strategyId, pubTwoId } = await seedCatalog(db);
+        const result = await getFilteredGames(db, { categoryIds: [strategyId], publisherIds: [pubTwoId] });
+        expect(result.map((g) => g.title)).toEqual(['Game B (Strategy, Pub Two)']);
+    });
+
+    it('returns an empty array when no games match the combined filters', async () => {
+        const { strategyId } = await seedCatalog(db);
+        const result = await getFilteredGames(db, { categoryIds: [strategyId], publisherIds: [999999] });
+        expect(result).toEqual([]);
+    });
+
+    it('returns an empty array for a non-existent category', async () => {
+        await seedCatalog(db);
+        const result = await getFilteredGames(db, { categoryIds: [999999] });
+        expect(result).toEqual([]);
+    });
+
+    it('treats empty filter arrays as no constraint', async () => {
+        await seedCatalog(db);
+        const result = await getFilteredGames(db, { categoryIds: [], publisherIds: [] });
+        expect(result).toHaveLength(4);
     });
 });
