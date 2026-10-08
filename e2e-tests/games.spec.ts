@@ -24,6 +24,24 @@ test.describe('Game Listing and Navigation', () => {
     });
   });
 
+  test('should display a star rating out of 5, or a no-rating message, on every game card', async ({ page }) => {
+    await test.step('Navigate to homepage', async () => {
+      await page.goto('/');
+      await expect(page.getByTestId('games-grid')).toBeVisible();
+    });
+
+    await test.step('Verify every game card shows a rating or the no-rating fallback', async () => {
+      const ratings = page.getByTestId('game-rating');
+      const count = await ratings.count();
+      expect(count).toBeGreaterThan(0);
+
+      for (let i = 0; i < count; i++) {
+        const ratingText = await ratings.nth(i).innerText();
+        expect(ratingText === 'No rating yet' || /^[★½☆]+\d\.\d out of 5$/.test(ratingText)).toBeTruthy();
+      }
+    });
+  });
+
   test('should navigate to correct game details page when clicking on a game', async ({ page }) => {
     let gameId: string | null;
     let gameTitle: string | null;
