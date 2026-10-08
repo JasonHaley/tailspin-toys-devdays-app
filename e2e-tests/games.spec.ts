@@ -36,8 +36,7 @@ test.describe('Game Listing and Navigation', () => {
       expect(count).toBeGreaterThan(0);
 
       for (let i = 0; i < count; i++) {
-        const ratingText = await ratings.nth(i).innerText();
-        expect(ratingText === 'No rating yet' || /^[★½☆]+\d\.\d out of 5$/.test(ratingText)).toBeTruthy();
+        await expect(ratings.nth(i)).toHaveText(/^(No rating yet|[★½☆]+\d\.\d out of 5)$/);
       }
     });
   });

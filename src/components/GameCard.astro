@@ -26,7 +26,7 @@ const { game } = Astro.props;
             <div class="mb-3 text-sm" data-testid="game-rating">
                 {game.starRating !== null ? (
                     <span class="text-slate-300">
-                        <span class="text-yellow-400">{formatStarRating(game.starRating)}</span>
+                        <span class="text-yellow-400" aria-hidden="true">{formatStarRating(game.starRating)}</span>
                         <span class="ml-1 text-slate-400">{clampRating(game.starRating).toFixed(1)} out of 5</span>
                     </span>
                 ) : (
