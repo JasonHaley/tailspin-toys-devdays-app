@@ -1,0 +1,136 @@
+---
+import type { Category, Publisher } from '../types/game';
+
+interface Props {
+    categories: Category[];
+    publishers: Publisher[];
+}
+
+const { categories, publishers } = Astro.props;
+---
+
+<div
+    class="mb-8 bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50"
+    data-testid="game-filters"
+>
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-medium text-slate-100">Filter games</h2>
+        <button
+            type="button"
+            id="clear-filters-button"
+            data-testid="clear-filters-button"
+            class="text-sm font-medium text-blue-400 hover:text-blue-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+        >
+            Clear filters
+        </button>
+    </div>
+
+    <div class="grid sm:grid-cols-2 gap-6">
+        <fieldset>
+            <legend class="text-sm font-semibold text-slate-200 mb-2">Category</legend>
+            <div class="flex flex-wrap gap-x-4 gap-y-2">
+                {categories.map((category) => (
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            class="game-filter-checkbox rounded border-slate-600 bg-slate-900 text-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            data-filter-dimension="category"
+                            data-filter-id={category.id}
+                            data-testid={`category-filter-${category.id}`}
+                        />
+                        {category.name}
+                    </label>
+                ))}
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend class="text-sm font-semibold text-slate-200 mb-2">Publisher</legend>
+            <div class="flex flex-wrap gap-x-4 gap-y-2">
+                {publishers.map((publisher) => (
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            class="game-filter-checkbox rounded border-slate-600 bg-slate-900 text-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            data-filter-dimension="publisher"
+                            data-filter-id={publisher.id}
+                            data-testid={`publisher-filter-${publisher.id}`}
+                        />
+                        {publisher.name}
+                    </label>
+                ))}
+            </div>
+        </fieldset>
+    </div>
+
+    <p
+        id="filter-status"
+        data-testid="filter-status"
+        role="status"
+        aria-live="polite"
+        class="mt-4 text-sm text-slate-400"
+    >
+    </p>
+</div>
+
+<script>
+    function setUp(): void {
+        const checkboxes = Array.from(
+            document.querySelectorAll<HTMLInputElement>('.game-filter-checkbox'),
+        );
+        const cards = Array.from(
+            document.querySelectorAll<HTMLElement>('[data-testid="game-card"]'),
+        );
+        const clearButton = document.getElementById('clear-filters-button');
+        const status = document.getElementById('filter-status');
+        const emptyState = document.querySelector<HTMLElement>('[data-testid="filters-empty-state"]');
+        const grid = document.querySelector<HTMLElement>('[data-testid="games-grid"]');
+
+        function selectedIds(dimension: string): string[] {
+            return checkboxes
+                .filter((checkbox) => checkbox.dataset.filterDimension === dimension && checkbox.checked)
+                .map((checkbox) => checkbox.dataset.filterId ?? '');
+        }
+
+        function applyFilters(): void {
+            const categoryIds = selectedIds('category');
+            const publisherIds = selectedIds('publisher');
+
+            let visibleCount = 0;
+            for (const card of cards) {
+                const matchesCategory = categoryIds.length === 0 || categoryIds.includes(card.dataset.categoryId ?? '');
+                const matchesPublisher =
+                    publisherIds.length === 0 || publisherIds.includes(card.dataset.publisherId ?? '');
+                const matches = matchesCategory && matchesPublisher;
+                card.hidden = !matches;
+                if (matches) {
+                    visibleCount += 1;
+                }
+            }
+
+            if (status) {
+                status.textContent =
+                    categoryIds.length === 0 && publisherIds.length === 0
+                        ? ''
+                        : `Showing ${visibleCount} of ${cards.length} games.`;
+            }
+
+            if (emptyState) {
+                emptyState.hidden = visibleCount !== 0 || cards.length === 0;
+            }
+            if (grid) {
+                grid.hidden = visibleCount === 0 && cards.length > 0;
+            }
+        }
+
+        checkboxes.forEach((checkbox) => checkbox.addEventListener('change', applyFilters));
+        clearButton?.addEventListener('click', () => {
+            checkboxes.forEach((checkbox) => {
+                checkbox.checked = false;
+            });
+            applyFilters();
+        });
+    }
+
+    setUp();
+</script>
